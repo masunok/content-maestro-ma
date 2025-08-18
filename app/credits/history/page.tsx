@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
@@ -10,16 +10,39 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, CreditCard, Plus, Minus, Gift } from "lucide-react"
 import Link from "next/link"
+import type { Database } from "@/lib/supabase"
+
+type CreditTransaction = Database['public']['Tables']['credit_transactions']['Row']
 
 export default function CreditHistoryPage() {
   const { user, isLoading, getCreditHistory } = useAuth()
   const router = useRouter()
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([])
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
   }, [user, isLoading, router])
+
+  useEffect(() => {
+    const fetchCreditHistory = async () => {
+      if (user) {
+        try {
+          setIsHistoryLoading(true)
+          const history = await getCreditHistory()
+          setCreditHistory(history)
+        } catch (error) {
+          console.error('크레딧 히스토리 조회 오류:', error)
+        } finally {
+          setIsHistoryLoading(false)
+        }
+      }
+    }
+
+    fetchCreditHistory()
+  }, [user, getCreditHistory])
 
   if (isLoading) {
     return (
@@ -35,8 +58,6 @@ export default function CreditHistoryPage() {
   if (!user) {
     return null
   }
-
-  const creditHistory = getCreditHistory()
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -89,6 +110,31 @@ export default function CreditHistoryPage() {
     }
   }
 
+  if (isHistoryLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-8">
+          <div className="mb-8">
+            <Button variant="ghost" asChild className="mb-4">
+              <Link href="/dashboard">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                대시보드로 돌아가기
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-serif font-bold mb-2">크레딧 사용 내역</h1>
+            <p className="text-muted-foreground">크레딧 구매 및 사용 내역을 확인하세요</p>
+          </div>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>내역을 불러오는 중...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -125,7 +171,7 @@ export default function CreditHistoryPage() {
                           <div>
                             <div className="font-medium">{transaction.description}</div>
                             <div className="text-sm text-muted-foreground">
-                              {new Date(transaction.createdAt).toLocaleDateString("ko-KR", {
+                              {new Date(transaction.created_at).toLocaleDateString("ko-KR", {
                                 year: "numeric",
                                 month: "long",
                                 day: "numeric",
@@ -180,7 +226,7 @@ export default function CreditHistoryPage() {
                     +
                     {creditHistory
                       .filter(
-                        (t) => t.type === "purchase" && new Date(t.createdAt).getMonth() === new Date().getMonth(),
+                        (t) => t.type === "purchase" && new Date(t.created_at).getMonth() === new Date().getMonth(),
                       )
                       .reduce((sum, t) => sum + t.amount, 0)}
                   </span>
@@ -189,7 +235,7 @@ export default function CreditHistoryPage() {
                   <span className="text-sm">이번 달 사용</span>
                   <span className="font-semibold text-red-600">
                     {creditHistory
-                      .filter((t) => t.type === "usage" && new Date(t.createdAt).getMonth() === new Date().getMonth())
+                      .filter((t) => t.type === "usage" && new Date(t.created_at).getMonth() === new Date().getMonth())
                       .reduce((sum, t) => sum + t.amount, 0)}
                   </span>
                 </div>

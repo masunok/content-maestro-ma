@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -8,6 +9,22 @@ import { User, LogOut, CreditCard } from "lucide-react"
 
 export function Header() {
   const { user, logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      // 로그아웃 성공 메시지
+      alert("로그아웃되었습니다.")
+      // 로그아웃 후 홈페이지로 리다이렉션
+      router.push("/")
+      // 페이지 새로고침으로 상태 완전 초기화
+      router.refresh()
+    } catch (error) {
+      console.error("로그아웃 중 오류:", error)
+      alert("로그아웃 중 오류가 발생했습니다.")
+    }
+  }
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -46,7 +63,7 @@ export function Header() {
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard">대시보드</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={logout}>
+                  <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     로그아웃
                   </DropdownMenuItem>

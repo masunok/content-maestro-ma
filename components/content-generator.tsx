@@ -37,11 +37,18 @@ export function ContentGenerator() {
       return
     }
 
-    const success = deductCredits(1, `${formData.contentType} 생성: ${formData.topic}`)
+    try {
+      const success = await deductCredits(1, `${formData.contentType} 생성: ${formData.topic}`)
 
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+      if (!success) {
+        alert("크레딧 사용에 실패했습니다.")
+        setIsGenerating(false)
+        return
+      }
 
-    const mockContent = `# ${formData.topic}
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      const mockContent = `# ${formData.topic}
 
 ${formData.keywords
   .split(",")
@@ -70,7 +77,6 @@ ${formData.topic}에 대한 이해를 바탕으로 실제 적용해보시기 바
 ---
 *이 콘텐츠는 AI에 의해 생성되었습니다. 사실 확인 후 사용하시기 바랍니다.*`
 
-    if (success) {
       setGeneratedContent(mockContent)
       setSeoTips([
         `제목에 주요 키워드 "${formData.keywords.split(",")[0]?.trim()}" 포함하기`,
@@ -82,11 +88,12 @@ ${formData.topic}에 대한 이해를 바탕으로 실제 적용해보시기 바
         `소셜미디어 공유 버튼 추가로 사회적 신호 강화`,
         `모바일 최적화 및 페이지 로딩 속도 개선`,
       ])
-    } else {
-      alert("크레딧 사용에 실패했습니다.")
+    } catch (error) {
+      console.error("콘텐츠 생성 중 오류:", error)
+      alert("콘텐츠 생성 중 오류가 발생했습니다.")
+    } finally {
+      setIsGenerating(false)
     }
-
-    setIsGenerating(false)
   }
 
   const handleSave = () => {
