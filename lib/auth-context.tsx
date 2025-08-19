@@ -98,7 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createUserProfile = async (userId: string, email: string, name: string) => {
     try {
-      const { error } = await supabase
+      // 프로필 생성
+      const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: userId,
@@ -109,21 +110,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString()
         })
 
-      if (error) {
-        console.error('프로필 생성 오류:', error)
-        return false
+      if (profileError) {
+        console.error('프로필 생성 오류:', profileError)
+        // 프로필 생성 실패 시에도 계속 진행 (이미 존재할 수 있음)
       }
 
-      // 환영 보너스 크레딧 트랜잭션 추가
-      await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          type: 'bonus',
-          amount: 10,
-          description: '회원가입 환영 보너스',
-          created_at: new Date().toISOString()
-        })
+      // 환영 보너스 크레딧 트랜잭션 추가 (오류가 발생해도 계속 진행)
+      try {
+        const { error: transactionError } = await supabase
+          .from('credit_transactions')
+          .insert({
+            user_id: userId,
+            type: 'bonus',
+            amount: 10,
+            description: '회원가입 환영 보너스',
+            created_at: new Date().toISOString()
+          })
+
+        if (transactionError) {
+          console.error('크레딧 트랜잭션 생성 오류:', transactionError)
+          // 트랜잭션 생성 실패는 치명적이지 않음
+        }
+      } catch (transactionError) {
+        console.error('크레딧 트랜잭션 생성 중 오류:', transactionError)
+      }
 
       return true
     } catch (error) {
@@ -208,10 +218,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
-        // 사용자 프로필 생성
-        const profileCreated = await createUserProfile(data.user.id, email, name)
-        if (profileCreated) {
+        // 사용자 프로필 생성 (오류가 발생해도 계속 진행)
+        try {
+          await createUserProfile(data.user.id, email, name)
           await fetchUserProfile(data.user.id)
+          return true
+        } catch (profileError) {
+          console.error('프로필 생성 중 오류:', profileError)
+          // 프로필 생성 실패 시에도 로그인은 성공으로 처리
           return true
         }
       }

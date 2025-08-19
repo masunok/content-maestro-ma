@@ -6,13 +6,12 @@ import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ArrowLeft, CreditCard, Smartphone, Building2, Shield, Zap } from "lucide-react"
+import { ArrowLeft, Shield, Zap, CreditCard } from "lucide-react"
 import Link from "next/link"
+import { TossPaymentWidget } from "@/components/toss-payment-widget"
+import { toast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
 
 const creditPackages = {
   basic: { name: "베이직", credits: 50, price: 9900 },
@@ -20,20 +19,18 @@ const creditPackages = {
   enterprise: { name: "엔터프라이즈", credits: 500, price: 79900 },
 }
 
+// 토스페이먼츠 요구사항에 맞는 안전한 주문 ID 생성
+function generateOrderId(): string {
+  const timestamp = Date.now()
+  const randomStr = Math.random().toString(36).substring(2, 8)
+  return `order_${timestamp}_${randomStr}`
+}
+
 export default function PaymentPage() {
-  const { user, isLoading, addCredits } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const packageId = searchParams.get("package") as keyof typeof creditPackages
-  const [paymentMethod, setPaymentMethod] = useState("card")
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [formData, setFormData] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvc: "",
-    cardholderName: "",
-    phoneNumber: "",
-  })
 
   const selectedPackage = packageId ? creditPackages[packageId] : null
 
@@ -45,21 +42,6 @@ export default function PaymentPage() {
       router.push("/credits")
     }
   }, [user, isLoading, selectedPackage, router])
-
-  const handlePayment = async () => {
-    if (!selectedPackage || !user) return
-
-    setIsProcessing(true)
-
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-
-    // Mock successful payment
-    addCredits(selectedPackage.credits, `${selectedPackage.name} 패키지 구매`)
-
-    // Redirect to success page
-    router.push(`/payment/success?package=${packageId}`)
-  }
 
   if (isLoading) {
     return (
@@ -126,123 +108,42 @@ export default function PaymentPage() {
               <CardTitle>결제 정보</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Payment Method Selection */}
-              <div className="space-y-3">
-                <Label>결제 방법</Label>
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                    <RadioGroupItem value="card" id="card" />
-                    <CreditCard className="h-4 w-4" />
-                    <Label htmlFor="card" className="flex-1 cursor-pointer">
-                      신용카드/체크카드
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                    <RadioGroupItem value="transfer" id="transfer" />
-                    <Building2 className="h-4 w-4" />
-                    <Label htmlFor="transfer" className="flex-1 cursor-pointer">
-                      계좌이체
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 p-3 border rounded-lg">
-                    <RadioGroupItem value="phone" id="phone" />
-                    <Smartphone className="h-4 w-4" />
-                    <Label htmlFor="phone" className="flex-1 cursor-pointer">
-                      휴대폰 결제
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Card Payment Form */}
-              {paymentMethod === "card" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cardNumber">카드번호</Label>
-                    <Input
-                      id="cardNumber"
-                      placeholder="1234 5678 9012 3456"
-                      value={formData.cardNumber}
-                      onChange={(e) => setFormData({ ...formData, cardNumber: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="expiryDate">유효기간</Label>
-                      <Input
-                        id="expiryDate"
-                        placeholder="MM/YY"
-                        value={formData.expiryDate}
-                        onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cvc">CVC</Label>
-                      <Input
-                        id="cvc"
-                        placeholder="123"
-                        value={formData.cvc}
-                        onChange={(e) => setFormData({ ...formData, cvc: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cardholderName">카드소유자명</Label>
-                    <Input
-                      id="cardholderName"
-                      placeholder="홍길동"
-                      value={formData.cardholderName}
-                      onChange={(e) => setFormData({ ...formData, cardholderName: e.target.value })}
-                    />
-                  </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+                  <CreditCard className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">토스페이먼츠로 안전하게 결제</span>
                 </div>
-              )}
-
-              {/* Phone Payment Form */}
-              {paymentMethod === "phone" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">휴대폰 번호</Label>
-                    <Input
-                      id="phoneNumber"
-                      placeholder="010-1234-5678"
-                      value={formData.phoneNumber}
-                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Transfer Payment Info */}
-              {paymentMethod === "transfer" && (
+                
                 <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    계좌이체를 선택하시면 가상계좌가 발급됩니다. 발급된 계좌로 입금하시면 자동으로 크레딧이 충전됩니다.
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <Shield className="h-4 w-4" />
+                    <span>결제 정보는 토스페이먼츠에서 안전하게 처리됩니다</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    신용카드, 계좌이체, 휴대폰 결제 등 다양한 결제 방법을 지원합니다.
                   </p>
                 </div>
-              )}
 
-              <Button className="w-full" onClick={handlePayment} disabled={isProcessing} size="lg">
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    결제 처리 중...
-                  </>
-                ) : (
-                  `${selectedPackage.price.toLocaleString()}원 결제하기`
-                )}
-              </Button>
+                <TossPaymentWidget
+                  clientKey={process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY || "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"}
+                  orderId={generateOrderId()}
+                  orderName={`${selectedPackage.name} 패키지 (${selectedPackage.credits} 크레딧)`}
+                  amount={selectedPackage.price}
+                  customerName={user?.name || user?.email?.split('@')[0] || '고객'}
+                  customerEmail={user?.email || 'customer@example.com'}
+                />
 
-              <div className="text-xs text-muted-foreground text-center">
-                결제 진행 시{" "}
-                <Link href="/terms" className="underline">
-                  이용약관
-                </Link>{" "}
-                및{" "}
-                <Link href="/privacy" className="underline">
-                  개인정보처리방침
-                </Link>
-                에 동의한 것으로 간주됩니다.
+                <div className="text-xs text-muted-foreground text-center">
+                  결제 진행 시{" "}
+                  <Link href="/terms" className="underline">
+                    이용약관
+                  </Link>{" "}
+                  및{" "}
+                  <Link href="/privacy" className="underline">
+                    개인정보처리방침
+                  </Link>
+                  에 동의한 것으로 간주됩니다.
+                </div>
               </div>
             </CardContent>
           </Card>
