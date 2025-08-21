@@ -8,6 +8,53 @@ export function EnvSetupNotice() {
   const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
   const hasSupabaseKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  // 개발 모드에서는 환경 변수가 없어도 경고를 표시하지 않음
+  if (process.env.NODE_ENV === 'development' && (!hasSupabaseUrl || !hasSupabaseKey)) {
+    return (
+      <Card className="border-amber-200 bg-amber-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-800">
+            <AlertTriangle className="h-5 w-5" />
+            개발 모드 - Mock 데이터 사용 중
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-3">
+                <p className="text-amber-800">
+                  환경 변수가 설정되지 않아 Mock 데이터로 실행됩니다. 
+                  실제 기능을 사용하려면 환경 변수를 설정해주세요.
+                </p>
+                
+                <div className="flex gap-2">
+                  <a 
+                    href="/ENV_SETUP.md" 
+                    target="_blank" 
+                    className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <FileText className="h-4 w-4" />
+                    설정 가이드
+                  </a>
+                  
+                  <a 
+                    href="https://supabase.com" 
+                    target="_blank" 
+                    className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Supabase 프로젝트 생성
+                  </a>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (hasSupabaseUrl && hasSupabaseKey) {
     return null
   }

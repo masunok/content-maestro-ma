@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isSupabaseConfigured) {
       // Supabase가 설정되지 않은 경우 mock 사용자 로드
+      console.log('⚠️ Supabase 환경 변수가 설정되지 않았습니다. Mock 모드로 실행됩니다.')
       const savedUser = localStorage.getItem("content-maestro-user")
       if (savedUser) {
         setUser(JSON.parse(savedUser))
