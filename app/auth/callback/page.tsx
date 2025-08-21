@@ -57,6 +57,8 @@ export default function AuthCallbackPage() {
               })
           }
 
+          // 구글 로그인 성공 시 대시보드로 이동
+          console.log('🚀 구글 로그인 성공, 대시보드로 이동합니다...')
           router.push("/dashboard")
         } else {
           router.push("/login")

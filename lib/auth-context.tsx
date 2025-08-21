@@ -85,6 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             // 사용자 프로필 조회
             await fetchUserProfile(session.user.id)
+            
+            // 로그인 성공 시 대시보드로 자동 이동
+            if (typeof window !== 'undefined') {
+              const currentPath = window.location.pathname
+              if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/') {
+                window.location.href = '/dashboard'
+              }
+            }
           } catch (error) {
             console.error('❌ 프로필 조회 실패:', error)
             // 프로필 조회 실패 시 기본 프로필 생성 시도
@@ -97,6 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               )
               if (success) {
                 await fetchUserProfile(session.user.id)
+                
+                // 프로필 생성 성공 시에도 대시보드로 이동
+                if (typeof window !== 'undefined') {
+                  const currentPath = window.location.pathname
+                  if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/') {
+                    window.location.href = '/dashboard'
+                  }
+                }
               }
             } catch (createError) {
               console.error('❌ 기본 프로필 생성도 실패:', createError)
@@ -304,6 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
+        console.log('✅ Supabase 로그인 성공:', data.user.id)
         await fetchUserProfile(data.user.id)
         return true
       }

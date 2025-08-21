@@ -51,6 +51,8 @@ export default function LoginPage() {
         // Supabase Auth 세션 설정
         const success = await login(email, password)
         if (success) {
+          // 로그인 성공 시 대시보드로 이동
+          console.log('🚀 대시보드로 이동합니다...')
           router.push("/dashboard")
         } else {
           setError("인증은 성공했지만 세션 설정에 실패했습니다.")
