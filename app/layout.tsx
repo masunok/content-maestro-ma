@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
+import { DebugEnv } from "@/components/debug-env"
 
 const workSans = Work_Sans({
   subsets: ["latin"],
@@ -32,7 +33,10 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${workSans.variable} ${openSans.variable} antialiased`}>
       <body className="font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <DebugEnv />
+        </AuthProvider>
       </body>
     </html>
   )

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -20,9 +20,126 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const { signup, loginWithGoogle, isLoading } = useAuth()
   const router = useRouter()
+
+  // 이메일과 이름 중복 확인
+  const checkAvailability = useCallback(async (email: string, name: string) => {
+    if (!email || email.length < 3 || !name || name.length < 2) {
+      setEmailStatus('idle')
+      return
+    }
+
+    setIsCheckingEmail(true)
+    setEmailStatus('checking')
+
+    try {
+      // 간단한 이메일 형식 검증
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        setEmailStatus('idle')
+        return
+      }
+
+      console.log('사용자 중복 확인 시작:', { email, name })
+
+      // 새로운 중복 확인 API 호출
+      const response = await fetch('/api/check-availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name })
+      })
+
+      if (!response.ok) {
+        console.error('중복 확인 API 오류:', response.status, response.statusText)
+        setEmailStatus('idle')
+        return
+      }
+
+      const result = await response.json()
+      console.log('중복 확인 API 응답:', result)
+
+      if (result.error) {
+        console.error('중복 확인 API 에러:', result.error, result.message)
+        setEmailStatus('idle')
+        return
+      }
+
+      console.log('🔍 중복 확인 결과 분석:', {
+        available: result.available,
+        details: result.details,
+        message: result.message
+      })
+
+      if (result.available !== undefined) {
+        setEmailStatus(result.available ? 'available' : 'taken')
+        console.log('사용자 상태 설정:', result.available ? 'available' : 'taken')
+        
+        // 상세한 중복 정보 로깅
+        if (result.details) {
+          console.log('중복 상세 정보:', result.details)
+        }
+      } else {
+        console.error('API 응답에 available 필드가 없음:', result)
+        setEmailStatus('idle')
+      }
+    } catch (err) {
+      console.error('중복 확인 중 오류:', err)
+      setEmailStatus('idle')
+    } finally {
+      setIsCheckingEmail(false)
+    }
+  }, []) // 의존성 제거
+
+  // 이메일과 이름 입력 시 디바운스 처리
+  useEffect(() => {
+    if (!email || email.length < 3 || !name || name.length < 2) {
+      setEmailStatus('idle')
+      return
+    }
+
+    console.log('사용자 중복 확인 디바운스 시작:', { email, name })
+    const timeoutId = setTimeout(() => {
+      console.log('사용자 중복 확인 실행:', { email, name })
+      checkAvailability(email, name)
+    }, 500)
+
+    return () => {
+      console.log('사용자 중복 확인 디바운스 취소:', { email, name })
+      clearTimeout(timeoutId)
+    }
+  }, [email, name, checkAvailability])
+
+  // 이메일 상태 변경 추적
+  useEffect(() => {
+    console.log('이메일 상태 변경:', emailStatus)
+  }, [emailStatus])
+
+  // 이름 입력 시 에러 메시지 초기화 및 중복 확인 트리거
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value
+    setName(newName)
+    setError("") // 이름 변경 시 에러 메시지 초기화
+    
+    // 이름이 변경되면 이메일 상태를 리셋하여 다시 확인하도록 함
+    if (email && email.length >= 3 && newName && newName.length >= 2) {
+      setEmailStatus('idle')
+      // 잠시 후 중복 확인 실행
+      setTimeout(() => {
+        checkAvailability(email, newName)
+      }, 100)
+    }
+  }
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value
+    setEmail(newEmail)
+    setError("") // 이메일 변경 시 에러 메시지 초기화
+  }
 
   const validatePassword = (password: string) => {
     const minLength = 10
@@ -69,32 +186,69 @@ export default function SignupPage() {
       return
     }
 
+    // 이메일 중복 상태 확인
+    if (emailStatus === 'taken') {
+      setError("이미 사용 중인 이메일입니다. 다른 이메일을 사용하거나 로그인해주세요.")
+      setIsSubmitting(false)
+      return
+    }
+
+    // 이메일 상태가 아직 확인되지 않은 경우
+    if (emailStatus === 'idle' || emailStatus === 'checking') {
+      setError("이메일 중복 확인이 완료되지 않았습니다. 잠시 후 다시 시도해주세요.")
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      const success = await signup(email, password, name)
-      if (success) {
-        router.push("/dashboard")
+      // 새로운 회원가입 API 호출
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        console.log('✅ 회원가입 성공:', data.user)
+        setSuccess("회원가입이 완료되었습니다! 로그인 페이지에서 로그인해주세요.")
+        setError("") // 에러 메시지 초기화
+        
+        // 3초 후 로그인 페이지로 이동
+        setTimeout(() => {
+          router.push("/login")
+        }, 3000)
       } else {
-        setError("회원가입에 실패했습니다. 다시 시도해주세요.")
+        // 오류 코드에 따른 메시지 처리
+        switch (data.code) {
+          case 'BOTH_TAKEN':
+            setError("이미 등록된 이메일과 이름입니다. 로그인 페이지에서 로그인해주세요.")
+            break
+          case 'EMAIL_TAKEN':
+            setError("이미 등록된 이메일입니다. 다른 이메일을 사용해주세요.")
+            break
+          case 'NAME_TAKEN':
+            setError("이미 등록된 이름입니다. 다른 이름을 사용해주세요.")
+            break
+          case 'CHECK_ERROR':
+            setError("중복 확인 중 오류가 발생했습니다.")
+            break
+          case 'AUTH_CREATE_ERROR':
+            setError("인증 시스템 오류가 발생했습니다.")
+            break
+          case 'PROFILE_CREATE_ERROR':
+            setError("사용자 프로필 생성에 실패했습니다.")
+            break
+          default:
+            setError(data.error || "회원가입에 실패했습니다.")
+        }
       }
     } catch (err: any) {
       console.error("회원가입 오류:", err)
-      
-      // Supabase 오류 메시지 처리
-      if (err.message) {
-        if (err.message.includes("User already registered")) {
-          setError("이미 등록된 이메일입니다. 로그인 페이지에서 로그인해주세요.")
-        } else if (err.message.includes("Password should be at least 6 characters")) {
-          setError("비밀번호는 최소 6자 이상이어야 합니다.")
-        } else if (err.message.includes("Invalid email")) {
-          setError("올바른 이메일 형식을 입력해주세요.")
-        } else if (err.message.includes("Unable to validate email")) {
-          setError("이메일 인증에 실패했습니다. 다시 시도해주세요.")
-        } else {
-          setError(`회원가입 중 오류가 발생했습니다: ${err.message}`)
-        }
-      } else {
-        setError("회원가입 중 오류가 발생했습니다. 다시 시도해주세요.")
-      }
+      setError("회원가입 중 오류가 발생했습니다. 다시 시도해주세요.")
     } finally {
       setIsSubmitting(false)
     }
@@ -138,10 +292,16 @@ export default function SignupPage() {
                   type="text"
                   placeholder="홍길동"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={handleNameChange}
                   required
                   disabled={isSubmitting}
                 />
+                {!name && (
+                  <p className="text-xs text-muted-foreground">이름을 입력해주세요.</p>
+                )}
+                {name && name.length < 2 && (
+                  <p className="text-xs text-muted-foreground">이름은 2자 이상이어야 합니다.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">이메일</Label>
@@ -150,10 +310,26 @@ export default function SignupPage() {
                   type="email"
                   placeholder="your@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   required
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isCheckingEmail}
                 />
+                {isCheckingEmail && (
+                  <p className="text-xs text-muted-foreground">사용자 정보 확인 중...</p>
+                )}
+                {emailStatus === 'available' && (
+                  <p className="text-xs text-green-500">✅ 사용 가능한 이메일입니다.</p>
+                )}
+                {emailStatus === 'taken' && (
+                  <p className="text-xs text-red-500">❌ 이미 사용 중인 이메일입니다.</p>
+                )}
+                {emailStatus === 'idle' && email && email.length >= 3 && (
+                  <p className="text-xs text-muted-foreground">
+                    {!name || name.length < 2 
+                      ? '이름을 입력하면 이메일 중복 확인이 시작됩니다.' 
+                      : '이메일 중복을 확인해주세요.'}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">비밀번호</Label>
@@ -192,9 +368,28 @@ export default function SignupPage() {
                   )}
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
+              
+              {success && (
+                <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                  {success}
+                  <div className="mt-2">
+                    <Link href="/login" className="text-green-600 hover:underline text-sm">
+                      로그인 페이지로 이동 →
+                    </Link>
+                  </div>
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={isSubmitting || isLoading || emailStatus === 'taken' || emailStatus === 'checking'}>
                 {isSubmitting ? "가입 중..." : "회원가입"}
               </Button>
+              
+              {emailStatus === 'taken' && (
+                <div className="text-sm text-center text-muted-foreground">
+                  <Link href="/login" className="text-primary hover:underline">
+                    이미 계정이 있으신가요? 로그인하기 →
+                  </Link>
+                </div>
+              )}
             </form>
 
             <div className="mt-6">

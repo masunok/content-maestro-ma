@@ -34,31 +34,52 @@ export default function LoginPage() {
     }
 
     try {
-      const success = await login(email, password)
-      if (success) {
-        router.push("/dashboard")
+      // 새로운 인증 API 호출
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        console.log('✅ 로그인 성공:', data.user)
+        
+        // Supabase Auth 세션 설정
+        const success = await login(email, password)
+        if (success) {
+          router.push("/dashboard")
+        } else {
+          setError("인증은 성공했지만 세션 설정에 실패했습니다.")
+        }
       } else {
-        setError("로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.")
+        // 오류 코드에 따른 메시지 처리
+        switch (data.code) {
+          case 'USER_NOT_FOUND':
+            setError("등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.")
+            break
+          case 'NO_PASSWORD_SET':
+            setError("비밀번호가 설정되지 않았습니다. 소셜 로그인을 사용해주세요.")
+            break
+          case 'INVALID_PASSWORD':
+            setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+            break
+          case 'PROFILE_ERROR':
+            setError("사용자 정보 조회 중 오류가 발생했습니다.")
+            break
+          case 'AUTH_ERROR':
+            setError("인증 시스템 오류가 발생했습니다.")
+            break
+          default:
+            setError(data.error || "로그인에 실패했습니다.")
+        }
       }
     } catch (err: any) {
       console.error("로그인 오류:", err)
-      
-      // Supabase 오류 메시지 처리
-      if (err.message) {
-        if (err.message.includes("Invalid login credentials")) {
-          setError("이메일 또는 비밀번호가 올바르지 않습니다.")
-        } else if (err.message.includes("Email not confirmed")) {
-          setError("이메일 인증이 필요합니다. 이메일을 확인해주세요.")
-        } else if (err.message.includes("Too many requests")) {
-          setError("너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.")
-        } else if (err.message.includes("User not found")) {
-          setError("등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.")
-        } else {
-          setError(`로그인 중 오류가 발생했습니다: ${err.message}`)
-        }
-      } else {
-        setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
-      }
+      setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
     } finally {
       setIsSubmitting(false)
     }

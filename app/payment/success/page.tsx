@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, Loader2, Zap, RefreshCw } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 
 const creditPackages = {
   basic: { name: "베이직", credits: 50, price: 9900 },
@@ -15,6 +16,7 @@ const creditPackages = {
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { user } = useAuth()
   const [isConfirming, setIsConfirming] = useState(false)
   const [confirmResult, setConfirmResult] = useState<any>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -32,11 +34,22 @@ export default function PaymentSuccessPage() {
       return
     }
 
+    // 사용자 정보가 로드될 때까지 대기
+    if (!user) {
+      console.log('Waiting for user data to load...')
+      return
+    }
+
     // 결제 승인 요청
     confirmPayment()
-  }, [orderId, amount, paymentKey])
+  }, [orderId, amount, paymentKey, user])
 
   const confirmPayment = async () => {
+    if (!user) {
+      console.error('User not authenticated')
+      return
+    }
+
     setIsConfirming(true)
 
     try {
@@ -44,6 +57,9 @@ export default function PaymentSuccessPage() {
         orderId,
         amount: parseInt(amount!),
         paymentKey,
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name
       }
 
       console.log('Confirming payment with data:', requestData)
@@ -56,11 +72,37 @@ export default function PaymentSuccessPage() {
         body: JSON.stringify(requestData),
       })
 
+      console.log('Payment confirmation response status:', response.status)
+      console.log('Payment confirmation response headers:', response.headers)
+
       const json = await response.json()
+      console.log('Payment confirmation response body:', json)
 
       if (!response.ok) {
-        console.error('Payment confirmation failed:', json)
-        setConfirmResult({ success: false, error: json })
+        console.error('Payment confirmation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: json
+        })
+        
+        // 더 자세한 에러 정보 제공
+        let errorMessage = '결제 승인에 실패했습니다.'
+        if (json.message) {
+          errorMessage = json.message
+        } else if (json.error) {
+          errorMessage = json.error
+        } else if (json.code) {
+          errorMessage = `오류 코드: ${json.code}`
+        }
+        
+        setConfirmResult({ 
+          success: false, 
+          error: { 
+            message: errorMessage,
+            details: json,
+            status: response.status
+          } 
+        })
         return
       }
 
@@ -68,7 +110,21 @@ export default function PaymentSuccessPage() {
       setConfirmResult({ success: true, data: json })
     } catch (error) {
       console.error('Payment confirmation error:', error)
-      setConfirmResult({ success: false, error: { message: '결제 승인 중 오류가 발생했습니다.' } })
+      
+      let errorMessage = '결제 승인 중 오류가 발생했습니다.'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
+      setConfirmResult({ 
+        success: false, 
+        error: { 
+          message: errorMessage,
+          details: error
+        } 
+      })
     } finally {
       setIsConfirming(false)
     }
@@ -192,12 +248,37 @@ export default function PaymentSuccessPage() {
 
               {confirmResult?.error && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-yellow-800 text-sm">
+                  <p className="text-yellow-800 text-sm font-semibold">
                     결제는 완료되었지만 승인에 실패했습니다.
                   </p>
                   <p className="text-yellow-700 text-xs mt-1">
                     {confirmResult.error.message}
                   </p>
+                  {confirmResult.error.status && (
+                    <p className="text-yellow-600 text-xs mt-1">
+                      HTTP 상태: {confirmResult.error.status}
+                    </p>
+                  )}
+                  {confirmResult.error.details && (
+                    <details className="mt-2">
+                      <summary className="text-yellow-600 text-xs cursor-pointer">
+                        상세 오류 정보 보기
+                      </summary>
+                      <pre className="text-yellow-600 text-xs mt-1 bg-yellow-100 p-2 rounded overflow-auto">
+                        {JSON.stringify(confirmResult.error.details, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                  <div className="mt-3">
+                    <Button 
+                      onClick={confirmPayment} 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full"
+                    >
+                      다시 시도
+                    </Button>
+                  </div>
                 </div>
               )}
 

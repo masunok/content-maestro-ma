@@ -46,61 +46,79 @@ export function ContentGenerator() {
         return
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // OpenAI API 호출
+      const response = await fetch('/api/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: formData.topic,
+          keywords: formData.keywords,
+          tone: formData.tone,
+          contentType: formData.contentType,
+        }),
+      })
 
-      const mockContent = `# ${formData.topic}
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '콘텐츠 생성에 실패했습니다.')
+      }
 
-${formData.keywords
-  .split(",")
-  .map((keyword) => keyword.trim())
-  .join(", ")}에 대한 포괄적인 가이드입니다.
-
-## 소개
-
-${formData.topic}는 현재 많은 사람들이 관심을 가지고 있는 주제입니다. 이 글에서는 ${formData.keywords.split(",")[0]?.trim()}를 중심으로 실용적인 정보를 제공하겠습니다.
-
-## 주요 내용
-
-### 1. 기본 개념 이해
-${formData.topic}의 기본적인 개념과 중요성에 대해 알아보겠습니다.
-
-### 2. 실제 적용 방법
-구체적인 실행 방법과 단계별 가이드를 제공합니다.
-
-### 3. 주의사항 및 팁
-실제 적용 시 주의해야 할 점들과 유용한 팁을 공유합니다.
-
-## 결론
-
-${formData.topic}에 대한 이해를 바탕으로 실제 적용해보시기 바랍니다. 추가 질문이 있으시면 언제든 문의해주세요.
-
----
-*이 콘텐츠는 AI에 의해 생성되었습니다. 사실 확인 후 사용하시기 바랍니다.*`
-
-      setGeneratedContent(mockContent)
-      setSeoTips([
-        `제목에 주요 키워드 "${formData.keywords.split(",")[0]?.trim()}" 포함하기`,
-        `메타 디스크립션을 150-160자로 작성하고 핵심 키워드 포함`,
-        `H1, H2, H3 태그를 활용한 구조화된 콘텐츠 작성`,
-        `이미지에 alt 텍스트 추가 및 파일명에 키워드 포함`,
-        `내부 링크 3-5개 추가로 사이트 체류시간 증가`,
-        `관련 키워드를 자연스럽게 본문에 2-3% 밀도로 배치`,
-        `소셜미디어 공유 버튼 추가로 사회적 신호 강화`,
-        `모바일 최적화 및 페이지 로딩 속도 개선`,
-      ])
+      const data = await response.json()
+      
+      if (data.success) {
+        setGeneratedContent(data.content)
+        setSeoTips(data.seoTips)
+      } else {
+        throw new Error('콘텐츠 생성에 실패했습니다.')
+      }
     } catch (error) {
       console.error("콘텐츠 생성 중 오류:", error)
-      alert("콘텐츠 생성 중 오류가 발생했습니다.")
+      alert(error instanceof Error ? error.message : "콘텐츠 생성 중 오류가 발생했습니다.")
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const handleSave = () => {
-    alert("콘텐츠가 저장되었습니다!")
-    setGeneratedContent("")
-    setSeoTips([])
-    setFormData({ topic: "", keywords: "", tone: "", contentType: "blog-post" })
+  const handleSave = async () => {
+    if (!generatedContent || !user) return
+
+    try {
+      const response = await fetch('/api/save-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: formData.topic,
+          content: generatedContent,
+          contentType: formData.contentType,
+          keywords: formData.keywords,
+          tone: formData.tone,
+          userId: user.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '콘텐츠 저장에 실패했습니다.')
+      }
+
+      const data = await response.json()
+      
+      if (data.success) {
+        alert("콘텐츠가 성공적으로 저장되었습니다!")
+        setGeneratedContent("")
+        setSeoTips([])
+        setFormData({ topic: "", keywords: "", tone: "", contentType: "blog-post" })
+      } else {
+        throw new Error('콘텐츠 저장에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error("콘텐츠 저장 중 오류:", error)
+      alert(error instanceof Error ? error.message : "콘텐츠 저장 중 오류가 발생했습니다.")
+    }
   }
 
   return (

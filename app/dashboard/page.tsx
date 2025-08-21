@@ -7,6 +7,7 @@ import { Header } from "@/components/header"
 import { ContentGenerator } from "@/components/content-generator"
 import { ContentHistory } from "@/components/content-history"
 import { DashboardStats } from "@/components/dashboard-stats"
+import { EnvSetupNotice } from "@/components/env-setup-notice"
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth()
@@ -41,6 +42,8 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-serif font-bold mb-2">대시보드</h1>
           <p className="text-muted-foreground">안녕하세요, {user.name}님! AI로 블로그 콘텐츠를 생성해보세요.</p>
         </div>
+
+        <EnvSetupNotice />
 
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-8">
