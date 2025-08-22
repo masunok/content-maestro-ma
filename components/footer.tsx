@@ -1,6 +1,17 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 export function Footer() {
+  const pathname = usePathname()
+  
+  // 현재 페이지가 로그인 페이지인지 확인
+  const isLoginPage = pathname === '/login'
+  
+  // 요금제 링크 설정
+  const pricingLink = isLoginPage ? '/#pricing' : '/#pricing'
+
   return (
     <footer className="border-t bg-muted/30">
       <div className="container py-12">
@@ -21,7 +32,7 @@ export function Footer() {
             <h4 className="font-serif font-semibold">서비스</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href={pricingLink} className="text-muted-foreground hover:text-foreground transition-colors">
                   요금제
                 </Link>
               </li>
