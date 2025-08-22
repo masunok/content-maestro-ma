@@ -34,6 +34,7 @@ const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 현재 세션 확인
     const getSession = async () => {
       try {
+        console.log('🔍 초기 세션 확인 시작...')
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) {
           console.error('❌ 세션 조회 오류:', error)
@@ -65,14 +67,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null)
           setIsLoading(false)
         }
+        
+        // 초기화 완료 표시
+        setIsInitialized(true)
       } catch (error) {
         console.error('❌ 세션 조회 중 오류:', error)
         setUser(null)
         setIsLoading(false)
+        setIsInitialized(true)
       }
     }
 
+    // 타임아웃을 추가하여 무한 로딩 방지
+    const timeoutId = setTimeout(() => {
+      if (isLoading && !isInitialized) {
+        console.log('⚠️ 세션 확인 타임아웃, 로딩 상태 해제')
+        setIsLoading(false)
+        setIsInitialized(true)
+      }
+    }, 5000) // 5초 후 타임아웃
+
     getSession()
+
+    return () => clearTimeout(timeoutId)
 
     // 인증 상태 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -176,12 +193,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔧 Supabase 클라이언트:', supabase ? '✅ 생성됨' : '❌ 생성되지 않음')
       
       console.log('🔍 프로필 존재 여부 확인 중...')
-      // 먼저 프로필이 존재하는지 확인
-      const { data: existingProfile, error: checkError } = await supabase
+      
+      // 타임아웃을 추가하여 데이터베이스 쿼리 무한 대기 방지
+      const profileCheckPromise = supabase
         .from('profiles')
         .select('id')
         .eq('id', userId)
         .maybeSingle()
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('프로필 확인 타임아웃')), 10000)
+      )
+
+      const { data: existingProfile, error: checkError } = await Promise.race([
+        profileCheckPromise,
+        timeoutPromise
+      ])
 
       if (checkError) {
         console.error('❌ 프로필 존재 여부 확인 오류:', checkError)
@@ -811,3 +838,4 @@ export function useAuth() {
   }
   return context
 }
+

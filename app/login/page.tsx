@@ -22,6 +22,9 @@ export default function LoginPage() {
   const { login, loginWithGoogle, isLoading } = useAuth()
   const router = useRouter()
 
+  // 로그인 페이지에서는 auth-context의 isLoading을 무시하고 로컬 상태만 사용
+  const isPageLoading = isSubmitting
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -99,6 +102,8 @@ export default function LoginPage() {
         // 구글 로그인은 OAuth 리다이렉트를 사용하므로 
         // 여기서는 성공 메시지만 표시하고 리다이렉트를 기다림
         setError("구글 로그인 페이지로 이동 중... 잠시만 기다려주세요.")
+        // OAuth 리다이렉트가 시작되면 로딩 상태 유지
+        // 페이지가 리다이렉트되므로 setIsSubmitting(false)를 호출하지 않음
       } else {
         setError("구글 로그인에 실패했습니다.")
         setIsSubmitting(false)
@@ -160,8 +165,8 @@ export default function LoginPage() {
                   )}
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
-                {isSubmitting ? "로그인 중..." : "로그인"}
+              <Button type="submit" className="w-full" disabled={isPageLoading}>
+                {isPageLoading ? "로그인 중..." : "로그인"}
               </Button>
             </form>
 
@@ -173,7 +178,7 @@ export default function LoginPage() {
                 variant="outline" 
                 className="w-full" 
                 onClick={handleGoogleLogin}
-                disabled={isSubmitting || isLoading}
+                disabled={isPageLoading}
               >
                 {isSubmitting ? (
                   <>
