@@ -87,11 +87,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // 사용자 프로필 조회
             await fetchUserProfile(session.user.id)
             
-            // 로그인 성공 시 대시보드로 자동 이동
+            // 로그인 성공 시 대시보드로 자동 이동 (콜백 페이지가 아닌 경우에만)
             if (typeof window !== 'undefined') {
               const currentPath = window.location.pathname
-              if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/') {
-                window.location.href = '/dashboard'
+              if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
+                  !currentPath.includes('/auth/callback')) {
+                // Next.js router를 사용하여 클라이언트 사이드 네비게이션
+                const { useRouter } = require('next/navigation')
+                // router는 useEffect 내부에서 직접 사용할 수 없으므로 
+                // 콜백 페이지에서 처리하도록 함
               }
             }
           } catch (error) {
@@ -107,11 +111,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (success) {
                 await fetchUserProfile(session.user.id)
                 
-                // 프로필 생성 성공 시에도 대시보드로 이동
+                // 프로필 생성 성공 시에도 대시보드로 이동 (콜백 페이지가 아닌 경우에만)
                 if (typeof window !== 'undefined') {
                   const currentPath = window.location.pathname
-                  if (currentPath === '/login' || currentPath === '/signup' || currentPath === '/') {
-                    window.location.href = '/dashboard'
+                  if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
+                      !currentPath.includes('/auth/callback')) {
+                    // Next.js router를 사용하여 클라이언트 사이드 네비게이션
+                    // router는 useEffect 내부에서 직접 사용할 수 없으므로 
+                    // 콜백 페이지에서 처리하도록 함
                   }
                 }
               }
@@ -491,24 +498,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setIsLoading(true)
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log('🔐 구글 OAuth 로그인 시작...')
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
         }
       })
 
       if (error) {
-        console.error('구글 로그인 오류:', error)
+        console.error('❌ 구글 로그인 오류:', error)
+        setIsLoading(false)
         return false
       }
 
-      return true
-    } catch (error) {
-      console.error('구글 로그인 중 오류:', error)
-      return false
-    } finally {
+      if (data) {
+        console.log('✅ 구글 OAuth URL 생성 성공:', data.url ? 'URL 생성됨' : 'URL 없음')
+        // OAuth 리다이렉트가 시작되면 true 반환
+        // 실제 인증은 콜백 페이지에서 처리됨
+        return true
+      }
+
+      console.log('⚠️ 구글 OAuth 응답에 데이터가 없습니다.')
       setIsLoading(false)
+      return false
+    } catch (error) {
+      console.error('❌ 구글 로그인 중 예외 발생:', error)
+      setIsLoading(false)
+      return false
     }
   }
 
