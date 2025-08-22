@@ -79,56 +79,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('🔐 인증 상태 변경:', event, session?.user?.id)
         
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ 사용자 로그인됨:', session.user.id)
-          setIsLoading(true)
-          
-          try {
-            // 사용자 프로필 조회
-            await fetchUserProfile(session.user.id)
-            
-            // 로그인 성공 시 대시보드로 자동 이동 (콜백 페이지가 아닌 경우에만)
-            if (typeof window !== 'undefined') {
-              const currentPath = window.location.pathname
-              if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
-                  !currentPath.includes('/auth/callback')) {
-                // Next.js router를 사용하여 클라이언트 사이드 네비게이션
-                const { useRouter } = require('next/navigation')
-                // router는 useEffect 내부에서 직접 사용할 수 없으므로 
-                // 콜백 페이지에서 처리하도록 함
-              }
-            }
-          } catch (error) {
-            console.error('❌ 프로필 조회 실패:', error)
-            // 프로필 조회 실패 시 기본 프로필 생성 시도
-            try {
-              console.log('🔄 기본 프로필 생성 시도...')
-              const success = await createUserProfile(
-                session.user.id, 
-                session.user.email || 'unknown@example.com',
-                session.user.user_metadata?.name || session.user.email?.split('@')[0] || '사용자'
-              )
-              if (success) {
-                await fetchUserProfile(session.user.id)
-                
-                // 프로필 생성 성공 시에도 대시보드로 이동 (콜백 페이지가 아닌 경우에만)
-                if (typeof window !== 'undefined') {
-                  const currentPath = window.location.pathname
-                  if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
-                      !currentPath.includes('/auth/callback')) {
-                    // Next.js router를 사용하여 클라이언트 사이드 네비게이션
-                    // router는 useEffect 내부에서 직접 사용할 수 없으므로 
-                    // 콜백 페이지에서 처리하도록 함
-                  }
-                }
-              }
-            } catch (createError) {
-              console.error('❌ 기본 프로필 생성도 실패:', createError)
-            }
-          } finally {
-            setIsLoading(false)
-          }
-        } else if (event === 'SIGNED_OUT') {
+                 if (event === 'SIGNED_IN' && session?.user) {
+           console.log('✅ 사용자 로그인됨:', session.user.id)
+           setIsLoading(true)
+           
+           try {
+             // 사용자 프로필 조회
+             await fetchUserProfile(session.user.id)
+             
+             // 로그인 성공 시 대시보드로 자동 이동 (콜백 페이지가 아닌 경우에만)
+             if (typeof window !== 'undefined') {
+               const currentPath = window.location.pathname
+               if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
+                   !currentPath.includes('/auth/callback')) {
+                 // Next.js router를 사용하여 클라이언트 사이드 네비게이션
+                 const { useRouter } = require('next/navigation')
+                 // router는 useEffect 내부에서 직접 사용할 수 없으므로 
+                 // 콜백 페이지에서 처리하도록 함
+               }
+             }
+           } catch (error) {
+             console.error('❌ 프로필 조회 실패:', error)
+             // 프로필 조회 실패 시 기본 프로필 생성 시도
+             try {
+               console.log('🔄 기본 프로필 생성 시도...')
+               const success = await createUserProfile(
+                 session.user.id, 
+                 session.user.email || 'unknown@example.com',
+                 session.user.user_metadata?.name || session.user.email?.split('@')[0] || '사용자'
+               )
+               if (success) {
+                 await fetchUserProfile(session.user.id)
+                 
+                 // 프로필 생성 성공 시에도 대시보드로 이동 (콜백 페이지가 아닌 경우에만)
+                 if (typeof window !== 'undefined') {
+                   const currentPath = window.location.pathname
+                   if ((currentPath === '/login' || currentPath === '/signup' || currentPath === '/') && 
+                       !currentPath.includes('/auth/callback')) {
+                     // Next.js router를 사용하여 클라이언트 사이드 네비게이션
+                     // router는 useEffect 내부에서 직접 사용할 수 없으므로 
+                     // 콜백 페이지에서 처리하도록 함
+                   }
+                 }
+               } else {
+                 // 프로필 생성 실패 시 로딩 상태 해제
+                 setIsLoading(false)
+               }
+             } catch (createError) {
+               console.error('❌ 기본 프로필 생성도 실패:', createError)
+               setIsLoading(false)
+             }
+           }
+           // fetchUserProfile에서 setIsLoading(false)를 처리하므로 여기서는 하지 않음
+         } else if (event === 'SIGNED_OUT') {
           console.log('🚪 사용자 로그아웃됨')
           setUser(null)
           setIsLoading(false)
@@ -154,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error('❌ Supabase 환경 변수가 설정되지 않았습니다.')
         console.error('📁 .env.local 파일을 확인하고 ENV_SETUP.md를 참고하세요.')
+        setIsLoading(false)
         return
       }
 
@@ -173,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (checkError) {
         console.error('❌ 프로필 존재 여부 확인 오류:', checkError)
+        setIsLoading(false)
         return
       }
 
@@ -183,6 +188,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (success) {
           // 생성 후 다시 조회
           await fetchUserProfile(userId)
+        } else {
+          setIsLoading(false)
         }
         return
       }
@@ -200,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('🔧 오류 메시지:', error.message)
         console.error('🔧 오류 세부사항:', error.details)
         console.error('🔧 오류 힌트:', error.hint)
+        setIsLoading(false)
         return
       }
 
@@ -210,18 +218,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (success) {
           // 생성 후 다시 조회
           await fetchUserProfile(userId)
+        } else {
+          setIsLoading(false)
         }
         return
       }
 
       console.log('✅ 프로필 조회 성공:', data)
+      console.log('🔄 사용자 상태 업데이트 중...')
       setUser(data)
+      console.log('🔄 로딩 상태 해제 중...')
+      setIsLoading(false)
+      console.log('✅ 모든 상태 업데이트 완료')
     } catch (error) {
       console.error('❌ 프로필 조회 중 예외 발생:', error)
       if (error instanceof Error) {
         console.error('🔧 오류 메시지:', error.message)
         console.error('🔧 오류 스택:', error.stack)
       }
+      setIsLoading(false)
     }
   }
 
@@ -295,7 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true
     } catch (error) {
       console.error('프로필 생성 중 오류:', error)
-      throw error
+      return false
     }
   }
 
