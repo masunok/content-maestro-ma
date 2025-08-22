@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Download, Eye, Trash2, Loader2 } from "lucide-react"
+import { FileText, Download, Eye, Trash2, Loader2, RefreshCw } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
@@ -20,27 +20,30 @@ interface ContentItem {
   tone: string
 }
 
-export function ContentHistory() {
+export interface ContentHistoryRef {
+  refresh: () => Promise<void>
+}
+
+export const ContentHistory = forwardRef<ContentHistoryRef>((props, ref) => {
   const { user } = useAuth()
   const [contentHistory, setContentHistory] = useState<ContentItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
   const [showContentModal, setShowContentModal] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      fetchContentHistory()
-    }
-  }, [user])
-
   const fetchContentHistory = async () => {
     if (!user) return
 
     try {
+      setIsLoading(true)
       const response = await fetch(`/api/content-history?userId=${user.id}`)
       if (response.ok) {
         const data = await response.json()
-        setContentHistory(data.contentHistory || [])
+        // 최신순으로 정렬 (created_at 기준 내림차순)
+        const sortedHistory = (data.contentHistory || []).sort((a: ContentItem, b: ContentItem) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+        setContentHistory(sortedHistory)
       }
     } catch (error) {
       console.error('콘텐츠 히스토리 조회 오류:', error)
@@ -48,6 +51,31 @@ export function ContentHistory() {
       setIsLoading(false)
     }
   }
+
+  // 외부에서 호출할 수 있는 새로고침 함수
+  useImperativeHandle(ref, () => ({
+    refresh: fetchContentHistory
+  }))
+
+  useEffect(() => {
+    if (user) {
+      fetchContentHistory()
+    }
+  }, [user])
+
+  // 콘텐츠 히스토리 새로고침 이벤트 리스너
+  useEffect(() => {
+    const handleRefreshEvent = () => {
+      console.log('🔄 콘텐츠 히스토리 새로고침 이벤트 감지')
+      fetchContentHistory()
+    }
+
+    window.addEventListener('refreshContentHistory', handleRefreshEvent)
+    
+    return () => {
+      window.removeEventListener('refreshContentHistory', handleRefreshEvent)
+    }
+  }, [])
 
   const handleViewContent = (content: ContentItem) => {
     setSelectedContent(content)
@@ -126,9 +154,25 @@ export function ContentHistory() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            콘텐츠 히스토리
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              콘텐츠 히스토리
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchContentHistory}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              새로고침
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -223,4 +267,4 @@ export function ContentHistory() {
       )}
     </>
   )
-}
+})

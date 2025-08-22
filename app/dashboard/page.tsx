@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
-import { ContentGenerator } from "@/components/content-generator"
-import { ContentHistory } from "@/components/content-history"
+import { ContentGenerator, ContentGeneratorRef } from "@/components/content-generator"
+import { ContentHistory, ContentHistoryRef } from "@/components/content-history"
 import { DashboardStats } from "@/components/dashboard-stats"
 import { EnvSetupNotice } from "@/components/env-setup-notice"
 
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const [loadingTimeout, setLoadingTimeout] = useState(false)
+  const contentHistoryRef = useRef<ContentHistoryRef>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -79,7 +80,7 @@ export default function DashboardPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-8">
             <ContentGenerator />
-            <ContentHistory />
+            <ContentHistory ref={contentHistoryRef} />
           </div>
           <div>
             <DashboardStats />

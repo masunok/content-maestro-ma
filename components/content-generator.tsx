@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, forwardRef, useImperativeHandle } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth-context"
 import { Wand2, Loader2, Lightbulb, Target } from "lucide-react"
 
-export function ContentGenerator() {
+export interface ContentGeneratorRef {
+  refreshHistory: () => Promise<void>
+}
+
+export const ContentGenerator = forwardRef<ContentGeneratorRef>((props, ref) => {
   const { user, deductCredits } = useAuth()
   const [isGenerating, setIsGenerating] = useState(false)
   const [formData, setFormData] = useState({
@@ -21,6 +25,14 @@ export function ContentGenerator() {
   })
   const [generatedContent, setGeneratedContent] = useState("")
   const [seoTips, setSeoTips] = useState<string[]>([])
+
+  // 외부에서 호출할 수 있는 새로고침 함수
+  useImperativeHandle(ref, () => ({
+    refreshHistory: async () => {
+      // 콘텐츠 히스토리 새로고침을 위한 이벤트 발생
+      window.dispatchEvent(new CustomEvent('refreshContentHistory'))
+    }
+  }))
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -109,6 +121,11 @@ export function ContentGenerator() {
       
       if (data.success) {
         alert("콘텐츠가 성공적으로 저장되었습니다!")
+        
+        // 콘텐츠 히스토리 새로고침 이벤트 발생
+        window.dispatchEvent(new CustomEvent('refreshContentHistory'))
+        
+        // 폼 초기화
         setGeneratedContent("")
         setSeoTips([])
         setFormData({ topic: "", keywords: "", tone: "", contentType: "blog-post" })
@@ -253,4 +270,4 @@ export function ContentGenerator() {
       </CardContent>
     </Card>
   )
-}
+})
