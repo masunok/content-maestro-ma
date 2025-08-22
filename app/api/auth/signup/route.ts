@@ -181,7 +181,22 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ 프로필 생성 확인 성공:', profile)
 
-    // 5. 트리거로 생성된 크레딧 트랜잭션 확인
+    // 5. 비밀번호 해시를 profiles 테이블에 저장
+    console.log('🔐 비밀번호 해시를 프로필에 저장 중...')
+    const { error: passwordUpdateError } = await supabase
+      .from('profiles')
+      .update({ password_hash: passwordHash })
+      .eq('id', authUserId)
+
+    if (passwordUpdateError) {
+      console.error('❌ 비밀번호 해시 저장 오류:', passwordUpdateError)
+      // 비밀번호 해시 저장 실패 시에도 회원가입은 성공으로 처리 (사용자는 나중에 비밀번호 재설정 가능)
+      console.log('⚠️ 비밀번호 해시 저장 실패했지만 회원가입은 계속 진행')
+    } else {
+      console.log('✅ 비밀번호 해시 저장 성공')
+    }
+
+    // 6. 트리거로 생성된 크레딧 트랜잭션 확인
     try {
       const { data: transaction, error: transactionError } = await supabase
         .from('credit_transactions')
