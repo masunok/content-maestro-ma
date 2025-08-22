@@ -151,8 +151,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string, retryCount = 0) => {
     try {
+      // 무한 루프 방지
+      if (retryCount > 2) {
+        console.error('❌ 프로필 조회 재시도 횟수 초과, 로딩 상태 해제')
+        setIsLoading(false)
+        return
+      }
+
       // 환경 변수 체크
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error('❌ Supabase 환경 변수가 설정되지 않았습니다.')
@@ -161,13 +168,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      console.log('🔍 프로필 조회 시작:', userId)
+      console.log(`🔍 프로필 조회 시작 (시도 ${retryCount + 1}/3):`, userId)
       console.log('🔧 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
       console.log('🔧 Supabase Anon Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ 설정됨' : '❌ 설정되지 않음')
       
       // Supabase 클라이언트 상태 확인
       console.log('🔧 Supabase 클라이언트:', supabase ? '✅ 생성됨' : '❌ 생성되지 않음')
       
+      console.log('🔍 프로필 존재 여부 확인 중...')
       // 먼저 프로필이 존재하는지 확인
       const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
@@ -177,23 +185,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (checkError) {
         console.error('❌ 프로필 존재 여부 확인 오류:', checkError)
+        console.error('🔧 오류 코드:', checkError.code)
+        console.error('🔧 오류 메시지:', checkError.message)
         setIsLoading(false)
         return
       }
+
+      console.log('🔍 프로필 존재 여부 확인 결과:', existingProfile ? '존재함' : '존재하지 않음')
 
       if (!existingProfile) {
         console.log('⚠️ 프로필이 존재하지 않습니다. 새로 생성합니다.')
         // 프로필이 존재하지 않으면 새로 생성
         const success = await createUserProfile(userId, 'unknown@example.com', '사용자')
         if (success) {
-          // 생성 후 다시 조회
-          await fetchUserProfile(userId)
+          console.log('🔄 프로필 생성 성공, 다시 조회 시도...')
+          // 생성 후 다시 조회 (재시도 횟수 증가)
+          await fetchUserProfile(userId, retryCount + 1)
         } else {
-          setIsLoading(false)
+          console.log('❌ 프로필 생성 실패, 간단한 프로필로 대체 시도...')
+          // 간단한 프로필로 대체
+          try {
+            const simpleProfile = {
+              id: userId,
+              email: 'unknown@example.com',
+              name: '사용자',
+              credits: 10,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+            console.log('🔄 간단한 프로필로 사용자 상태 설정...')
+            setUser(simpleProfile)
+            setIsLoading(false)
+            console.log('✅ 간단한 프로필로 대시보드 로드 완료')
+          } catch (simpleError) {
+            console.error('❌ 간단한 프로필 설정도 실패:', simpleError)
+            setIsLoading(false)
+          }
         }
         return
       }
 
+      console.log('🔍 기존 프로필 발견, 전체 정보 조회 중...')
       // 프로필이 존재하면 전체 정보 조회 (maybeSingle 사용으로 더 안전하게)
       const { data, error } = await supabase
         .from('profiles')
@@ -216,10 +248,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 프로필이 없으면 새로 생성
         const success = await createUserProfile(userId, 'unknown@example.com', '사용자')
         if (success) {
-          // 생성 후 다시 조회
-          await fetchUserProfile(userId)
+          console.log('🔄 프로필 생성 성공, 다시 조회 시도...')
+          // 생성 후 다시 조회 (재시도 횟수 증가)
+          await fetchUserProfile(userId, retryCount + 1)
         } else {
-          setIsLoading(false)
+          console.log('❌ 프로필 생성 실패, 간단한 프로필로 대체 시도...')
+          // 간단한 프로필로 대체
+          try {
+            const simpleProfile = {
+              id: userId,
+              email: 'unknown@example.com',
+              name: '사용자',
+              credits: 10,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+            console.log('🔄 간단한 프로필로 사용자 상태 설정...')
+            setUser(simpleProfile)
+            setIsLoading(false)
+            console.log('✅ 간단한 프로필로 대시보드 로드 완료')
+          } catch (simpleError) {
+            console.error('❌ 간단한 프로필 설정도 실패:', simpleError)
+            setIsLoading(false)
+          }
         }
         return
       }
@@ -236,14 +287,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('🔧 오류 메시지:', error.message)
         console.error('🔧 오류 스택:', error.stack)
       }
+      console.log('❌ 예외 발생으로 로딩 상태 해제')
       setIsLoading(false)
     }
   }
 
   const createUserProfile = async (userId: string, email: string, name: string) => {
     try {
-      console.log('프로필 생성 시작:', { userId, email, name })
+      console.log('🔧 프로필 생성 시작:', { userId, email, name })
       
+      console.log('🔧 SECURITY DEFINER 함수 호출 시도...')
       // SECURITY DEFINER 함수를 사용하여 프로필 생성 (RLS 우회)
       const { data: profileResult, error: profileError } = await supabase
         .rpc('create_or_update_user_profile', {
@@ -254,8 +307,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
       
       if (profileError) {
-        console.error('SECURITY DEFINER 함수 호출 실패:', profileError)
+        console.error('❌ SECURITY DEFINER 함수 호출 실패:', profileError)
+        console.error('🔧 오류 코드:', profileError.code)
+        console.error('🔧 오류 메시지:', profileError.message)
         
+        console.log('🔄 백업 방법: 직접 프로필 생성 시도...')
         // 백업 방법: 직접 프로필 생성 시도 (RLS 정책이 허용하는 경우)
         try {
           const { error: directProfileError } = await supabase
@@ -270,22 +326,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })
 
           if (directProfileError) {
-            console.error('직접 프로필 생성도 실패:', directProfileError)
+            console.error('❌ 직접 프로필 생성도 실패:', directProfileError)
+            console.error('🔧 오류 코드:', directProfileError.code)
+            console.error('🔧 오류 메시지:', directProfileError.message)
             throw directProfileError
           }
           
-          console.log('백업 방법으로 프로필 생성 성공')
+          console.log('✅ 백업 방법으로 프로필 생성 성공')
         } catch (directError) {
-          console.error('모든 프로필 생성 방법 실패:', directError)
+          console.error('❌ 모든 프로필 생성 방법 실패:', directError)
           throw profileError // 원래 에러를 던짐
         }
       } else if (!profileResult) {
-        console.error('프로필 생성 함수가 false 반환')
+        console.error('❌ 프로필 생성 함수가 false 반환')
         throw new Error('프로필 생성 함수가 실패했습니다')
       } else {
-        console.log('SECURITY DEFINER 함수로 프로필 생성 성공')
+        console.log('✅ SECURITY DEFINER 함수로 프로필 생성 성공')
       }
 
+      console.log('🔧 환영 보너스 크레딧 트랜잭션 추가 시도...')
       // 환영 보너스 크레딧 트랜잭션 추가 (트리거가 이미 처리했지만 백업으로도 시도)
       try {
         const { error: transactionError } = await supabase
@@ -297,19 +356,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
 
         if (transactionError) {
-          console.error('백업 크레딧 트랜잭션 생성 실패:', transactionError)
-          // 트랜잭션 생성 실패는 치명적이지 않음
+          console.error('⚠️ 백업 크레딧 트랜잭션 생성 실패 (치명적이지 않음):', transactionError)
         } else {
-          console.log('백업 크레딧 트랜잭션 생성 성공')
+          console.log('✅ 백업 크레딧 트랜잭션 생성 성공')
         }
       } catch (transactionError) {
-        console.error('백업 크레딧 트랜잭션 생성 중 오류:', transactionError)
-        // 트랜잭션 생성 실패는 치명적이지 않음
+        console.error('⚠️ 백업 크레딧 트랜잭션 생성 중 오류 (치명적이지 않음):', transactionError)
       }
 
+      console.log('✅ 프로필 생성 완료')
       return true
     } catch (error) {
-      console.error('프로필 생성 중 오류:', error)
+      console.error('❌ 프로필 생성 중 오류:', error)
+      if (error instanceof Error) {
+        console.error('🔧 오류 메시지:', error.message)
+        console.error('🔧 오류 스택:', error.stack)
+      }
       return false
     }
   }
