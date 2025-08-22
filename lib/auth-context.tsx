@@ -604,10 +604,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
       console.log('🔐 구글 OAuth 로그인 시작...')
       
+      // 환경에 따른 리다이렉트 URL 설정
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      let redirectUrl = `${window.location.origin}/auth/callback`
+      
+      // 환경 변수로 강제 설정 가능
+      if (process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URL) {
+        redirectUrl = process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URL
+        console.log('🔧 환경 변수로 리다이렉트 URL 강제 설정:', redirectUrl)
+      } else if (isLocalhost) {
+        redirectUrl = `${window.location.origin}/auth/callback`
+        console.log('🏠 로컬호스트 환경, 리다이렉트 URL:', redirectUrl)
+      } else {
+        redirectUrl = 'https://content-maestro-ma.vercel.app/auth/callback'
+        console.log('🌐 프로덕션 환경, 리다이렉트 URL:', redirectUrl)
+      }
+      
+      console.log('📍 최종 리다이렉트 URL:', redirectUrl)
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'

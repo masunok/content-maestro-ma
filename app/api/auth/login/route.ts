@@ -22,14 +22,14 @@ export async function POST(request: NextRequest) {
     console.log('🔍 사용자 인증 시도:', email)
 
     // 1. profiles 테이블에서 사용자 조회
-    const { data: profile, error: profileError } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('profiles')
       .select('id, email, password_hash, name, credits')
       .eq('email', email)
       .single()
 
-    if (profileError) {
-      if (profileError.code === 'PGRST116') {
+    if (userError) {
+      if (userError.code === 'PGRST116') {
         // 사용자를 찾을 수 없음
         console.log('❌ 등록되지 않은 이메일:', email)
         return NextResponse.json({
@@ -39,16 +39,16 @@ export async function POST(request: NextRequest) {
         }, { status: 401 })
       }
       
-      console.error('❌ 프로필 조회 오류:', profileError)
+      console.error('❌ 사용자 조회 오류:', userError)
       return NextResponse.json({
         success: false,
         error: '사용자 정보 조회 중 오류가 발생했습니다.',
-        code: 'PROFILE_ERROR'
+        code: 'USER_ERROR'
       }, { status: 500 })
     }
 
-    if (!profile) {
-      console.log('❌ 프로필이 존재하지 않음:', email)
+    if (!userData) {
+      console.log('❌ 사용자 데이터가 존재하지 않음:', email)
       return NextResponse.json({
         success: false,
         error: '등록되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.',
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. 비밀번호 해시 확인
-    if (!profile.password_hash) {
+    if (!userData.password_hash) {
       console.log('❌ 비밀번호 해시가 없음:', email)
       return NextResponse.json({
         success: false,
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bcrypt = await import('bcryptjs')
-    const isPasswordValid = await bcrypt.compare(password, profile.password_hash)
+    const isPasswordValid = await bcrypt.compare(password, userData.password_hash)
     
     if (!isPasswordValid) {
       console.log('❌ 비밀번호 불일치:', email)
@@ -126,10 +126,10 @@ export async function POST(request: NextRequest) {
           success: true,
           message: '로그인에 성공했습니다.',
           user: {
-            id: profile.id,
-            email: profile.email,
-            name: profile.name,
-            credits: profile.credits
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            credits: userData.credits
           },
           session: signInData.session
         })
@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
         success: true,
         message: '로그인에 성공했습니다.',
         user: {
-          id: profile.id,
-          email: profile.email,
-          name: profile.name,
-          credits: profile.credits
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          credits: userData.credits
         },
         session: authData.session
       })

@@ -72,7 +72,10 @@ export default function LoginPage() {
           case 'INVALID_PASSWORD':
             setError("이메일 또는 비밀번호가 올바르지 않습니다.")
             break
-          case 'PROFILE_ERROR':
+          case 'PASSWORD_UPDATE_ERROR':
+            setError("비밀번호 설정 중 오류가 발생했습니다. 다시 시도해주세요.")
+            break
+          case 'USER_ERROR':
             setError("사용자 정보 조회 중 오류가 발생했습니다.")
             break
           case 'AUTH_ERROR':
